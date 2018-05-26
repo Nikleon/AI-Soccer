@@ -1,7 +1,8 @@
 package org.tero.ai_soccer.gui;
 
+import org.tero.ai_soccer.sim.GameState;
+
 import javafx.scene.layout.BorderPane;
-import not.my.code.GameState;
 
 public class Gui extends BorderPane {
 

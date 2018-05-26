@@ -1,9 +1,12 @@
 package org.tero.ai_soccer.gui;
 
+import org.tero.ai_soccer.sim.GameState;
+
 import javafx.animation.AnimationTimer;
 import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
-import not.my.code.GameState;
+import javafx.scene.paint.Color;
 
 public class GameViewer extends Canvas {
     private static final int WIDTH = 1200;
@@ -15,6 +18,7 @@ public class GameViewer extends Canvas {
 
     private GameState game;
 
+    private GraphicsContext g2d;
     private AnimationTimer timer;
     private long lastFrameTimeStamp;
     private boolean speedUp = false;
@@ -33,12 +37,13 @@ public class GameViewer extends Canvas {
 		speedUp = false;
 	});
 
+	g2d = this.getGraphicsContext2D();
 	timer = new AnimationTimer() {
 	    @Override
 	    public void handle(long now) {
-		if (!speedUp && !(lastFrameTimeStamp - now > 1_000 / FPS))
+		if (!speedUp && !(now - lastFrameTimeStamp > 1_000 / FPS))
 		    return;
-		if (speedUp && !(lastFrameTimeStamp - now > 1_000 / (FPS * SPEEDUP_MULTIPLIER)))
+		if (speedUp && !(now - lastFrameTimeStamp > 1_000 / (FPS * SPEEDUP_MULTIPLIER)))
 		    return;
 		lastFrameTimeStamp = now;
 		tick();
@@ -62,6 +67,7 @@ public class GameViewer extends Canvas {
 
     public void stop() {
 	timer.stop();
+	fillBackground(g2d, Color.WHITE);
     }
 
     public void setGame(GameState game) {
@@ -71,7 +77,15 @@ public class GameViewer extends Canvas {
     private void tick() {
 	if (game == null)
 	    return;
+	game.update();
 
+	fillBackground(g2d, Color.WHITE);
+	game.draw(g2d, WIDTH, HEIGHT);
+    }
+
+    private void fillBackground(GraphicsContext g, Color fill) {
+	g.setFill(fill);
+	g.fillRect(0, 0, WIDTH, HEIGHT);
     }
 
 }

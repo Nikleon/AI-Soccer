@@ -1,6 +1,7 @@
 package org.tero.ai_soccer;
 
 import org.tero.ai_soccer.gui.Gui;
+import org.tero.ai_soccer.sim.GameState;
 
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -24,6 +25,8 @@ public class AISoccer extends Application {
 	primaryStage.sizeToScene();
 	primaryStage.centerOnScreen();
 	primaryStage.show();
+
+	gui.viewGame(new GameState());
     }
 
     public static void main(String[] args) {
