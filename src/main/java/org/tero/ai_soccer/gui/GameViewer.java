@@ -14,7 +14,7 @@ public class GameViewer extends Canvas {
 
     private static final double FPS = 60;
     private static final KeyCode SPEEDUP_KEY = KeyCode.SPACE;
-    private static final double SPEEDUP_MULTIPLIER = 3;
+    private static final double SPEEDUP_MULTIPLIER = Double.MAX_VALUE;
 
     private GameState game;
 
@@ -41,14 +41,16 @@ public class GameViewer extends Canvas {
 	timer = new AnimationTimer() {
 	    @Override
 	    public void handle(long now) {
-		if (!speedUp && !(now - lastFrameTimeStamp > 1_000 / FPS))
+		if (!speedUp && (now - lastFrameTimeStamp < 1e9 / FPS))
 		    return;
-		if (speedUp && !(now - lastFrameTimeStamp > 1_000 / (FPS * SPEEDUP_MULTIPLIER)))
+		if (speedUp && (now - lastFrameTimeStamp < 1e9 / (FPS * SPEEDUP_MULTIPLIER)))
 		    return;
 		lastFrameTimeStamp = now;
 		tick();
 	    }
 	};
+
+	this.setFocusTraversable(true);
     }
 
     public GameViewer() {
