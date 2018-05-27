@@ -277,20 +277,19 @@ public class GameState {
 	    g.setFill(Color.WHITE);
 	    g.fillRect(-width / 2 + 20, -height / 2 + 10, 10, 50);
 	    g.fillRect(-width / 2 + 50, -height / 2 + 10, 10, 50);
-	    g.setStroke(Color.WHITE);
 	    if (pause > 0) {
-		g.strokeText("" + (int) (pause / 30 + 1), -width / 2 + 100, -height / 2 + 70);
+		g.fillText("" + (int) (pause / 30 + 1), -width / 2 + 100, -height / 2 + 70);
 	    }
 	}
-	g.setStroke(Color.WHITE);
-	g.strokeText("" + lScore, -width / 2 + 50, height / 2 - 20);
-	g.strokeText("" + rScore, width / 2 - 100, height / 2 - 20);
+	g.setFill(Color.WHITE);
+	g.fillText("" + lScore, -width / 2 + 50, height / 2 - 20);
+	g.fillText("" + rScore, width / 2 - 100, height / 2 - 20);
 	if (replay) {
-	    g.strokeText("" + replayTime / 60, 0, -height / 2 + 50);
-	    g.setStroke(Color.YELLOW);
-	    g.strokeText("REPLAY", width / 2 - 300, -height / 2 + 50);
+	    g.fillText("" + replayTime / 60, 0, -height / 2 + 50);
+	    g.setFill(Color.YELLOW);
+	    g.fillText("REPLAY", width / 2 - 300, -height / 2 + 50);
 	} else {
-	    g.strokeText("" + time / 60, 0, -height / 2 + 50);
+	    g.fillText("" + time / 60, 0, -height / 2 + 50);
 	}
 	g.setTransform(origTransform);
     }
