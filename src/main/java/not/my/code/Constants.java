@@ -9,7 +9,7 @@ public class Constants {
 	public static final int NODES_PER_LAYER = 16;
 	public static final int OUTPUT = 3; // delta x
 	public static final double CROSSOVER_RATE = 0.1;
-	public static final double MUTATION_RATE = 0.1;
+	public static final double MUTATION_RATE = 0.01;
 	
 										// BIAS--------------------------------|
 	public static final int WEIGHTS =  (HIDDEN_LAYERS)*NODES_PER_LAYER + OUTPUT + NODES_PER_LAYER*NODES_PER_LAYER*(HIDDEN_LAYERS-1)+NODES_PER_LAYER*(INPUTS+OUTPUT);

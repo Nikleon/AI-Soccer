@@ -12,7 +12,7 @@ public class GameViewer extends Canvas {
     private static final int WIDTH = 1200;
     private static final int HEIGHT = 800;
 
-    private static final double FPS = 60;
+    private static final double FPS = 80;
     private static final KeyCode SPEEDUP_KEY = KeyCode.SPACE;
     private static final double SPEEDUP_MULTIPLIER = Double.MAX_VALUE;
 

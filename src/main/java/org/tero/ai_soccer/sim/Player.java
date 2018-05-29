@@ -1,120 +1,161 @@
 package org.tero.ai_soccer.sim;
 
+import org.tero.ai_soccer.util.Context;
+import org.tero.ai_soccer.util.Vector2D;
+
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
+import javafx.scene.transform.Transform;
 import not.my.code.Action;
 import not.my.code.AndrewMethod;
+import not.my.code.GameState;
 
-public class Player {
-    public final static int radius = 20;
-    public final static int shockwaveRadius = 20;
-    public final static double hitSlowRatio = 0.95;
+public class Player /* extends not.my.code.Player */ {
+    protected static final Transform LEFT = Transform.rotate(0, 0, 0);
+    protected static final Transform RIGHT = Transform.rotate(180, 0, 0);
 
-    public double x, y;
-    public double xv, yv;
-    public boolean t;
-    public int shockwaveFrame;
-    public double[] weights;
+    protected static final double RADIUS = 20;
+    protected static final double SHOCKWAVE_RADIUS = 20;
+    protected static final double HIT_SLOW_RATIO = 0.95;
 
-    public Action takeAction(double ballx, double bally, double ballvx, double ballvy, double a1x, double a1y,
-	    double a2x, double a2y, double e1x, double e1y, double e2x, double e2y, double e3x, double e3y) {
-	if (t) {
-	    Action action = AndrewMethod.takeAction(-x, y, -ballx, bally, -ballvx, ballvy, -a1x, a1y, -a2x, a2y, -e1x,
-		    e1y, -e2x, e2y, -e3x, e3y);
-	    return new Action(-action.fx, action.fy, action.hit);
-	} else {
-	    return AndrewMethod.takeAction(x, y, ballx, bally, ballvx, ballvy, a1x, a1y, a2x, a2y, e1x, e1y, e2x, e2y,
-		    e3x, e3y);
+    /**
+     * Position vector -> (0,0) is center.
+     */
+    protected Vector2D pos;
+
+    /**
+     * Velocity vector (in pixels per frame).
+     */
+    protected Vector2D vel;
+
+    /**
+     * Indicated whether coordinates need to be flipped. If false, then flip.
+     */
+    protected boolean leftTeam;
+
+    /**
+     * Indicates uniform number of player to distinguish from team members.
+     */
+    protected int number;
+
+    /**
+     * Transform to player's relative coordinate system.
+     */
+    protected Transform transform;
+
+    /**
+     * Frames left of ongoing shockwave animation, 0 if not ongoing.
+     */
+    protected int shockwaveAnimationFramesLeft;
+
+    public Player(Vector2D pos, boolean flipped, int playerId) {
+	this.pos = pos.clone();
+	vel = new Vector2D(0, 0);
+
+	leftTeam = !flipped;
+	number = playerId;
+	transform = (leftTeam) ? LEFT : RIGHT;
+
+	shockwaveAnimationFramesLeft = 0;
+    }
+
+    /**
+     * Returns this player's preferred next action given a set of data to base its
+     * decision on. Uses AndrewMethod AI. Override this method to add functionality.
+     * 
+     * @param ctx
+     *            the context, i.e. game object positions, etc...
+     * @return the preferred next {@link Action}
+     */
+    public Action takeAction(Context ctx) {
+	double[] c = ctx.getRelativeContext(leftTeam, number, transform);
+	Action andrewAiAction = AndrewMethod.takeAction(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9],
+		c[10], c[11], c[12], c[13], c[14], c[15]);
+	return andrewAiAction.relativeToGlobal(transform);
+    }
+
+    public void drawPlayer(GraphicsContext g) {
+	if (leftTeam)
+	    g.setFill(Color.ORANGE);
+	else
+	    g.setFill(Color.BLUE);
+
+	g.fillOval(pos.x - RADIUS, pos.y - RADIUS, 2 * RADIUS, 2 * RADIUS);
+	g.setStroke(Color.BLACK);
+	g.strokeOval(pos.x - RADIUS, pos.y - RADIUS, 2 * RADIUS, 2 * RADIUS);
+    }
+
+    public void drawShockwave(GraphicsContext g) {
+	if (shockwaveAnimationFramesLeft > 0) {
+	    g.setFill(Color.WHITE);
+	    g.fillOval(pos.x - RADIUS - shockwaveAnimationFramesLeft * (SHOCKWAVE_RADIUS) / 5,
+		    pos.y - RADIUS - shockwaveAnimationFramesLeft * (SHOCKWAVE_RADIUS) / 5,
+		    2 * RADIUS + shockwaveAnimationFramesLeft * (SHOCKWAVE_RADIUS) / 5 * 2,
+		    2 * RADIUS + shockwaveAnimationFramesLeft * (SHOCKWAVE_RADIUS) / 5 * 2);
 	}
     }
 
-    public Player(int x, int y, boolean team) {
-	this.xv = 0;
-	this.yv = 0;
-	this.x = x;
-	this.y = y;
-	t = team;
-	shockwaveFrame = 0;
-    }
-
-    public void update(Action a) {
-	double speed = dist(0, 0, xv, yv);
+    public void update(Action globalAction) {
+	double speed = vel.magnitude();
 	if (speed > 40) {
-	    xv *= 40 / speed;
-	    yv *= 40 / speed;
+	    vel = vel.times(40 / speed);
 	}
-	double vx = a.fx + xv;
-	double vy = a.fy + yv;
+
+	// wtf
+	double x = pos.x;
+	double y = pos.y;
+	double xv = vel.x;
+	double yv = vel.y;
+
+	double vx = globalAction.fx + xv;
+	double vy = globalAction.fy + yv;
 
 	double tempx = vx;
 	double tempy = vy;
 	boolean clear = false;
 	while (!clear) {
 	    clear = true;
-	    // boolean hitY = false;
-	    if (Math.abs(y + tempy) + radius > GameState.HEIGHT) {
+	    if (Math.abs(y + tempy) + RADIUS > GameState.HEIGHT) {
 		clear = false;
 		vy *= -.8;
 		if (y > 0) {
-		    tempy = -.8 * (y + tempy + radius - GameState.HEIGHT);
-		    y = GameState.HEIGHT - radius;
+		    tempy = -.8 * (y + tempy + RADIUS - GameState.HEIGHT);
+		    y = GameState.HEIGHT - RADIUS;
 		} else {
-		    tempy = -.8 * (y + tempy - radius + GameState.HEIGHT);
-		    y = -GameState.HEIGHT + radius;
+		    tempy = -.8 * (y + tempy - RADIUS + GameState.HEIGHT);
+		    y = -GameState.HEIGHT + RADIUS;
 		}
-		// hitY = true;
 	    }
-	    if (Math.abs(x + tempx) + radius > GameState.LENGTH) {
+	    if (Math.abs(x + tempx) + RADIUS > GameState.LENGTH) {
 		clear = false;
 		vx *= -.8;
 		if (x > 0) {
-		    tempx = -.8 * (x + tempx + radius - GameState.LENGTH);
-		    x = GameState.LENGTH - radius;
+		    tempx = -.8 * (x + tempx + RADIUS - GameState.LENGTH);
+		    x = GameState.LENGTH - RADIUS;
 		} else {
-		    tempx = -.8 * (x + tempx - radius + GameState.LENGTH);
-		    x = -GameState.LENGTH + radius;
+		    tempx = -.8 * (x + tempx - RADIUS + GameState.LENGTH);
+		    x = -GameState.LENGTH + RADIUS;
 		}
 	    }
 	}
 	x += tempx;
 	y += tempy;
-	xv *= hitSlowRatio;
-	yv *= hitSlowRatio;
+	xv *= HIT_SLOW_RATIO;
+	yv *= HIT_SLOW_RATIO;
 	if (Math.abs(xv) < .5)
 	    xv = 0;
 	if (Math.abs(yv) < .5)
 	    xv = 0;
-	if (a.hit && shockwaveFrame == 0)
-	    shockwaveFrame++;
-	if (shockwaveFrame != 0)
-	    shockwaveFrame++;
-	if (shockwaveFrame == 6)
-	    shockwaveFrame = -15;
-    }
+	if (globalAction.hit && shockwaveAnimationFramesLeft == 0)
+	    shockwaveAnimationFramesLeft++;
+	if (shockwaveAnimationFramesLeft != 0)
+	    shockwaveAnimationFramesLeft++;
+	if (shockwaveAnimationFramesLeft == 6)
+	    shockwaveAnimationFramesLeft = -15;
 
-    public void drawPlayer(GraphicsContext g) {
-	if (t)
-	    g.setFill(Color.BLUE);
-	else
-	    g.setFill(Color.ORANGE);
-
-	g.fillOval((int) (x - radius), (int) (y - radius), (int) (2 * radius), (int) (2 * radius));
-	g.setStroke(Color.BLACK);
-	g.strokeOval((int) (x - radius), (int) (y - radius), (int) (2 * radius), (int) (2 * radius));
-    }
-
-    public void drawShockwave(GraphicsContext g) {
-	if (shockwaveFrame > 0) {
-	    g.setFill(Color.WHITE);
-	    g.fillOval((int) (x - radius - shockwaveFrame * (shockwaveRadius) / 5),
-		    (int) (y - radius - shockwaveFrame * (shockwaveRadius) / 5),
-		    (int) (2 * radius + shockwaveFrame * (shockwaveRadius) / 5 * 2),
-		    (int) (2 * radius + shockwaveFrame * (shockwaveRadius) / 5 * 2));
-	}
-    }
-
-    private double dist(double x1, double y1, double x2, double y2) {
-	return Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+	// un-wtf
+	pos = Vector2D.of(x, y);
+	vel = Vector2D.of(xv, yv);
     }
 
 }

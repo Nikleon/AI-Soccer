@@ -118,24 +118,24 @@ public class GameState {
 	private boolean updateBall(){
 		for (int i = 0; i < lTeam.length; i++) {
 			double dist = dist(ball.x, ball.y, lTeam[i].x, lTeam[i].y);
-			if (dist < Player.radius + Ball.radius) {
+			if (dist < Player.RADIUS + Ball.radius) {
 				ball.vx += (ball.x - lTeam[i].x) / dist * 2.5;
 				ball.vy += (ball.y - lTeam[i].y) / dist * 2.5;
-				ball.x = lTeam[i].x + (ball.x - lTeam[i].x) * (Player.radius + Ball.radius) / dist;
-				ball.y = lTeam[i].y + (ball.y - lTeam[i].y) * (Player.radius + ball.radius) / dist;
+				ball.x = lTeam[i].x + (ball.x - lTeam[i].x) * (Player.RADIUS + Ball.radius) / dist;
+				ball.y = lTeam[i].y + (ball.y - lTeam[i].y) * (Player.RADIUS + ball.radius) / dist;
 			}
-			if (dist < Player.radius + Player.shockwaveRadius && lTeam[i].shockwaveFrame > 0) {
+			if (dist < Player.RADIUS + Player.shockwaveRadius && lTeam[i].shockwaveFrame > 0) {
 				ball.vx += (ball.x - lTeam[i].x) / dist * 20;
 				ball.vy += (ball.y - lTeam[i].y) / dist * 20;
 			}
 			dist = dist(ball.x, ball.y, rTeam[i].x, rTeam[i].y);
-			if (dist < Player.radius + Ball.radius) {
+			if (dist < Player.RADIUS + Ball.radius) {
 				ball.vx += (ball.x - rTeam[i].x) / dist * 2.5;
 				ball.vy += (ball.y - rTeam[i].y) / dist * 2.5;
-				ball.x = rTeam[i].x + (ball.x - rTeam[i].x) * (Player.radius + Ball.radius) / dist;
-				ball.y = rTeam[i].y + (ball.y - rTeam[i].y) * (Player.radius + Ball.radius) / dist;
+				ball.x = rTeam[i].x + (ball.x - rTeam[i].x) * (Player.RADIUS + Ball.radius) / dist;
+				ball.y = rTeam[i].y + (ball.y - rTeam[i].y) * (Player.RADIUS + Ball.radius) / dist;
 			}
-			if (dist < Player.radius + Player.shockwaveRadius && rTeam[i].shockwaveFrame > 0) {
+			if (dist < Player.RADIUS + Player.shockwaveRadius && rTeam[i].shockwaveFrame > 0) {
 				ball.vx += (ball.x - rTeam[i].x) / dist * 20;
 				ball.vy += (ball.y - rTeam[i].y) / dist * 20;
 			}
@@ -204,11 +204,11 @@ public class GameState {
 			for (int j = 0; j < allPlayers.length; j++){
 				if (i == j) continue;
 				double dist = dist(allPlayers[i].x,allPlayers[i].y,allPlayers[j].x,allPlayers[j].y);
-				if (dist < 2*Player.radius){
-					allPlayers[i].x = (allPlayers[i].x + allPlayers[j].x)/2 + (allPlayers[i].x - allPlayers[j].x)*Player.radius/dist;
-					allPlayers[j].x = (allPlayers[i].x + allPlayers[j].x)/2 + (allPlayers[i].x - allPlayers[j].x)*Player.radius/-dist;
-					allPlayers[i].y = (allPlayers[i].y + allPlayers[j].y)/2 + (allPlayers[i].y - allPlayers[j].y)*Player.radius/dist;
-					allPlayers[j].y = (allPlayers[i].y + allPlayers[j].y)/2 + (allPlayers[i].y - allPlayers[j].y)*Player.radius/-dist;
+				if (dist < 2*Player.RADIUS){
+					allPlayers[i].x = (allPlayers[i].x + allPlayers[j].x)/2 + (allPlayers[i].x - allPlayers[j].x)*Player.RADIUS/dist;
+					allPlayers[j].x = (allPlayers[i].x + allPlayers[j].x)/2 + (allPlayers[i].x - allPlayers[j].x)*Player.RADIUS/-dist;
+					allPlayers[i].y = (allPlayers[i].y + allPlayers[j].y)/2 + (allPlayers[i].y - allPlayers[j].y)*Player.RADIUS/dist;
+					allPlayers[j].y = (allPlayers[i].y + allPlayers[j].y)/2 + (allPlayers[i].y - allPlayers[j].y)*Player.RADIUS/-dist;
 					
 					allPlayers[i].xv += (allPlayers[i].x - allPlayers[j].x)/dist;
 					allPlayers[i].yv += (allPlayers[i].y - allPlayers[j].y)/dist;
@@ -216,11 +216,11 @@ public class GameState {
 					allPlayers[j].yv += (allPlayers[i].y - allPlayers[j].y)/-dist;
 					
 				}
-				if (dist < 2*Player.radius + Player.shockwaveRadius && allPlayers[i].shockwaveFrame > 0){
+				if (dist < 2*Player.RADIUS + Player.shockwaveRadius && allPlayers[i].shockwaveFrame > 0){
 					allPlayers[j].xv += (allPlayers[i].x - allPlayers[j].x)*10/-dist;
 					allPlayers[j].yv += (allPlayers[i].y - allPlayers[j].y)*10/-dist;
 				}
-				if (dist < 2*Player.radius + Player.shockwaveRadius && allPlayers[j].shockwaveFrame > 0){
+				if (dist < 2*Player.RADIUS + Player.shockwaveRadius && allPlayers[j].shockwaveFrame > 0){
 					allPlayers[i].xv += (allPlayers[i].x - allPlayers[j].x)*10/dist;
 					allPlayers[i].yv += (allPlayers[i].y - allPlayers[j].y)*10/dist;
 				}

@@ -1,5 +1,10 @@
 package org.tero.ai_soccer.sim;
 
+import org.tero.ai_soccer.ai.AiPlayer;
+import org.tero.ai_soccer.ai.NeuralNet;
+import org.tero.ai_soccer.util.Context;
+import org.tero.ai_soccer.util.Vector2D;
+
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -7,40 +12,73 @@ import javafx.scene.transform.Affine;
 import not.my.code.Action;
 
 public class GameState {
-    public static double dist(double x, double y, double x1, double y1) {
-	return (Math.sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1)));
-    }
+    private static final double FIELD_LENGTH = 500;
+    private static final double FIELD_WIDTH = 300;
 
-    public static final int LENGTH = 500;
-    public static final int HEIGHT = 300;
-    public static final int goalHeight = 100;
-    public static final double ballSlowRatio = 0.99;
-    public static final double ballHitSlowRatio = 0.8;
+    private static final double GOAL_HEIGHT = 100;
+    private static final double BALL_SLOW_RATIO = 0.99;
+    private static final double BALL_HIT_SLOW_RATIO = 0.8;
+
+    private final NeuralNet leftAi;
+    private final NeuralNet rightAi;
+
+    private boolean isReplaying;
+    private int replayTimeLeft;
+
+    private int time;
     private int pause; // -1 is permanent, 0 is not paused, >0 is a count-down.
+
+    private Ball ball;
+    private Vector2D ballStartPos;
+
     private Player[] lTeam;
     private Player[] rTeam;
-    private Ball ball;
-    public int lScore;
-    public int rScore;
-    private int time;
-    int replayTime;
-    double ballStartx;
-    double ballStarty;
-    boolean replay;
+    private int lScore;
+    private int rScore;
 
-    public GameState() {
-	replay = false;
-	replayTime = 0;
+    public GameState(NeuralNet ai1, NeuralNet ai2) {
+	isReplaying = false;
+	replayTimeLeft = 0;
+
 	time = 0;
+	pause = 90;
+
+	ball = new Ball();
+	ballStartPos = new Vector2D(ball.x, ball.y);
+
 	lScore = 0;
 	rScore = 0;
-	pause = 90;
-	lTeam = new Player[] { new Player(-100, 100, false), new Player(-200, -200, false),
-		new Player(-400, 0, false) };
-	rTeam = new Player[] { new Player(100, -100, true), new Player(200, 200, true), new Player(400, 0, true) };
-	ball = new Ball();
-	ballStartx = ball.x;
-	ballStarty = ball.y;
+
+	leftAi = ai1;
+	rightAi = ai2;
+	fillTeams(ai1, ai2);
+    }
+
+    private void reset() {
+	ball.reset();
+	ballStartPos = new Vector2D(ball.x, ball.y);
+    }
+
+    private void fillTeams(NeuralNet leftAi, NeuralNet rightAi) {
+	Vector2D[] initialPos = { Vector2D.of(-100, 100), Vector2D.of(-200, -200), Vector2D.of(-400, 0) };
+
+	lTeam = new Player[3];
+	for (int i = 0; i < 3; i++) {
+	    if (leftAi != null) {
+		lTeam[i] = new AiPlayer(initialPos[i], false, i, leftAi);
+	    } else {
+		lTeam[i] = new Player(initialPos[i], false, i);
+	    }
+	}
+
+	rTeam = new Player[3];
+	for (int i = 0; i < 3; i++) {
+	    if (rightAi != null) {
+		rTeam[i] = new AiPlayer(initialPos[i].times(-1), true, i, rightAi);
+	    } else {
+		rTeam[i] = new Player(initialPos[i].times(-1), true, i);
+	    }
+	}
     }
 
     public void update() {
@@ -51,73 +89,65 @@ public class GameState {
 	if (pause == -1) {
 	    return;
 	}
-	if (replay) {
-	    replayTime--;
+	if (isReplaying) {
+	    replayTimeLeft--;
 	} else {
 	    time++;
-	    replayTime++;
+	    replayTimeLeft++;
 	}
+
 	double[] prevX = new double[6];
 	double[] prevY = new double[6];
-	prevX[0] = lTeam[0].x;
-	prevX[1] = lTeam[1].x;
-	prevX[2] = lTeam[2].x;
-	prevX[3] = rTeam[0].x;
-	prevX[4] = rTeam[1].x;
-	prevX[5] = rTeam[2].x;
-	prevY[0] = lTeam[0].y;
-	prevY[1] = lTeam[1].y;
-	prevY[2] = lTeam[2].y;
-	prevY[3] = rTeam[0].y;
-	prevY[4] = rTeam[1].y;
-	prevY[5] = rTeam[2].y;
+	prevX[0] = lTeam[0].pos.x;
+	prevX[1] = lTeam[1].pos.x;
+	prevX[2] = lTeam[2].pos.x;
+	prevX[3] = rTeam[0].pos.x;
+	prevX[4] = rTeam[1].pos.x;
+	prevX[5] = rTeam[2].pos.x;
+	prevY[0] = lTeam[0].pos.y;
+	prevY[1] = lTeam[1].pos.y;
+	prevY[2] = lTeam[2].pos.y;
+	prevY[3] = rTeam[0].pos.y;
+	prevY[4] = rTeam[1].pos.y;
+	prevY[5] = rTeam[2].pos.y;
 	Action[] actions = new Action[lTeam.length + rTeam.length];
-	actions[0] = lTeam[0].takeAction(ball.x - 0.0001, ball.y - 0.0001, ball.vx, ball.vy, lTeam[1].x, lTeam[1].y,
-		lTeam[2].x, lTeam[2].y, rTeam[0].x, rTeam[0].y, rTeam[1].x, rTeam[1].y, rTeam[2].x, rTeam[2].y);
-	actions[1] = lTeam[1].takeAction(ball.x - 0.0001, ball.y - 0.0001, ball.vx, ball.vy, lTeam[0].x, lTeam[0].y,
-		lTeam[2].x, lTeam[2].y, rTeam[0].x, rTeam[0].y, rTeam[1].x, rTeam[1].y, rTeam[2].x, rTeam[2].y);
-	actions[2] = lTeam[2].takeAction(ball.x - 0.0001, ball.y - 0.0001, ball.vx, ball.vy, lTeam[0].x, lTeam[0].y,
-		lTeam[1].x, lTeam[1].y, rTeam[0].x, rTeam[0].y, rTeam[1].x, rTeam[1].y, rTeam[2].x, rTeam[2].y);
-	actions[3] = rTeam[0].takeAction(ball.x + 0.0001, ball.y + 0.0001, ball.vx, ball.vy, rTeam[1].x, rTeam[1].y,
-		rTeam[2].x, rTeam[2].y, lTeam[0].x, lTeam[0].y, lTeam[1].x, lTeam[1].y, lTeam[2].x, lTeam[2].y);
-	actions[4] = rTeam[1].takeAction(ball.x + 0.0001, ball.y + 0.0001, ball.vx, ball.vy, rTeam[0].x, rTeam[0].y,
-		rTeam[2].x, rTeam[2].y, lTeam[0].x, lTeam[0].y, lTeam[1].x, lTeam[1].y, lTeam[2].x, lTeam[2].y);
-	actions[5] = rTeam[2].takeAction(ball.x + 0.0001, ball.y + 0.0001, ball.vx, ball.vy, rTeam[0].x, rTeam[0].y,
-		rTeam[1].x, rTeam[1].y, lTeam[0].x, lTeam[0].y, lTeam[1].x, lTeam[1].y, lTeam[2].x, lTeam[2].y);
-	lTeam[0].update(actions[0]);
-	lTeam[1].update(actions[1]);
-	lTeam[2].update(actions[2]);
-	rTeam[0].update(actions[3]);
-	rTeam[1].update(actions[4]);
-	rTeam[2].update(actions[5]);
+	Context context = new Context(ball.x - 0.0001, ball.y - 0.0001, ball.vx, ball.vy, lTeam[0].pos.x,
+		lTeam[0].pos.y, lTeam[1].pos.x, lTeam[1].pos.y, lTeam[2].pos.x, lTeam[2].pos.y, rTeam[0].pos.x,
+		rTeam[0].pos.y, rTeam[1].pos.x, rTeam[1].pos.y, rTeam[2].pos.x, rTeam[2].pos.y);
+
+	for (int i = 0; i < 3; i++) {
+	    actions[i] = lTeam[i].takeAction(context);
+	    actions[3 + i] = rTeam[i].takeAction(context);
+	}
+	for (int i = 0; i < 3; i++) {
+	    lTeam[i].update(actions[i]);
+	    rTeam[i].update(actions[3 + i]);
+	}
+
 	checkPlayerCollisions();
 	if (updateBall()) {
-	    if (replay) {
+	    if (isReplaying) {
 		pause = 90;
-		lTeam = new Player[] { new Player(-100, 100, false), new Player(-200, -200, false),
-			new Player(-400, 0, false) };
-		rTeam = new Player[] { new Player(100, -100, true), new Player(200, 200, true),
-			new Player(400, 0, true) };
-		ball.reset();
-		ballStartx = ball.x;
-		ballStarty = ball.y;
-		replay = false;
-		replayTime = 0;
+
+		fillTeams(leftAi, rightAi);
+
+		reset();
+		isReplaying = false;
+		replayTimeLeft = 0;
 	    } else {
 		if (ball.x < 0)
 		    rScore++;
 		else
 		    lScore++;
 		pause = 90;
-		lTeam = new Player[] { new Player(-100, 100, false), new Player(-200, -200, false),
-			new Player(-400, 0, false) };
-		rTeam = new Player[] { new Player(100, -100, true), new Player(200, 200, true),
-			new Player(400, 0, true) };
-		replay = true;
+
+		fillTeams(leftAi, rightAi);
+
+		isReplaying = true;
 		ball.reset();
-		ball.x = ballStartx;
-		ball.y = ballStarty;
-		int tempTime = replayTime;
+		ball.x = ballStartPos.x;
+		ball.y = ballStartPos.y;
+		int tempTime = replayTimeLeft;
 		for (int i = 0; i < tempTime - 100; i++) {
 		    update();
 		}
@@ -127,30 +157,30 @@ public class GameState {
 
     private boolean updateBall() {
 	for (int i = 0; i < lTeam.length; i++) {
-	    double dist = dist(ball.x, ball.y, lTeam[i].x, lTeam[i].y);
-	    if (dist < Player.radius + Ball.radius) {
-		ball.vx += (ball.x - lTeam[i].x) / dist * 2.5;
-		ball.vy += (ball.y - lTeam[i].y) / dist * 2.5;
-		ball.x = lTeam[i].x + (ball.x - lTeam[i].x) * (Player.radius + Ball.radius) / dist;
-		ball.y = lTeam[i].y + (ball.y - lTeam[i].y) * (Player.radius + Ball.radius) / dist;
+	    double dist = Vector2D.of(lTeam[i].pos.x - ball.x, lTeam[i].pos.y - ball.y).magnitude();
+	    if (dist < Player.RADIUS + Ball.radius) {
+		ball.vx += (ball.x - lTeam[i].pos.x) / dist * 2.5;
+		ball.vy += (ball.y - lTeam[i].pos.y) / dist * 2.5;
+		ball.x = lTeam[i].pos.x + (ball.x - lTeam[i].pos.x) * (Player.RADIUS + Ball.radius) / dist;
+		ball.y = lTeam[i].pos.y + (ball.y - lTeam[i].pos.y) * (Player.RADIUS + Ball.radius) / dist;
 	    }
-	    if (dist < Player.radius + Player.shockwaveRadius && lTeam[i].shockwaveFrame > 0) {
-		ball.vx += (ball.x - lTeam[i].x) / dist * 20;
-		ball.vy += (ball.y - lTeam[i].y) / dist * 20;
+	    if (dist < Player.RADIUS + Player.SHOCKWAVE_RADIUS && lTeam[i].shockwaveAnimationFramesLeft > 0) {
+		ball.vx += (ball.x - lTeam[i].pos.x) / dist * 20;
+		ball.vy += (ball.y - lTeam[i].pos.y) / dist * 20;
 	    }
-	    dist = dist(ball.x, ball.y, rTeam[i].x, rTeam[i].y);
-	    if (dist < Player.radius + Ball.radius) {
-		ball.vx += (ball.x - rTeam[i].x) / dist * 2.5;
-		ball.vy += (ball.y - rTeam[i].y) / dist * 2.5;
-		ball.x = rTeam[i].x + (ball.x - rTeam[i].x) * (Player.radius + Ball.radius) / dist;
-		ball.y = rTeam[i].y + (ball.y - rTeam[i].y) * (Player.radius + Ball.radius) / dist;
+	    dist = Vector2D.of(rTeam[i].pos.x - ball.x, rTeam[i].pos.y - ball.y).magnitude();
+	    if (dist < Player.RADIUS + Ball.radius) {
+		ball.vx += (ball.x - rTeam[i].pos.x) / dist * 2.5;
+		ball.vy += (ball.y - rTeam[i].pos.y) / dist * 2.5;
+		ball.x = rTeam[i].pos.x + (ball.x - rTeam[i].pos.x) * (Player.RADIUS + Ball.radius) / dist;
+		ball.y = rTeam[i].pos.y + (ball.y - rTeam[i].pos.y) * (Player.RADIUS + Ball.radius) / dist;
 	    }
-	    if (dist < Player.radius + Player.shockwaveRadius && rTeam[i].shockwaveFrame > 0) {
-		ball.vx += (ball.x - rTeam[i].x) / dist * 20;
-		ball.vy += (ball.y - rTeam[i].y) / dist * 20;
+	    if (dist < Player.RADIUS + Player.SHOCKWAVE_RADIUS && rTeam[i].shockwaveAnimationFramesLeft > 0) {
+		ball.vx += (ball.x - rTeam[i].pos.x) / dist * 20;
+		ball.vy += (ball.y - rTeam[i].pos.y) / dist * 20;
 	    }
 	}
-	double speed = dist(0, 0, ball.vx, ball.vy);
+	double speed = Vector2D.of(ball.vx, ball.vy).magnitude();
 	if (speed > 30) {
 	    ball.vx *= 30 / speed;
 	    ball.vy *= 30 / speed;
@@ -161,41 +191,41 @@ public class GameState {
 	while (!clear) {
 	    clear = true;
 	    boolean hitY = false;
-	    if (Math.abs(ball.y + tempy) + Ball.radius > GameState.HEIGHT) {
+	    if (Math.abs(ball.y + tempy) + Ball.radius > GameState.FIELD_WIDTH) {
 		clear = false;
-		ball.vy *= -ballHitSlowRatio;
+		ball.vy *= -BALL_HIT_SLOW_RATIO;
 		if (ball.y > 0) {
-		    tempy = -ballHitSlowRatio * (ball.y + tempy + Ball.radius - GameState.HEIGHT);
-		    ball.y = GameState.HEIGHT - Ball.radius;
+		    tempy = -BALL_HIT_SLOW_RATIO * (ball.y + tempy + Ball.radius - GameState.FIELD_WIDTH);
+		    ball.y = GameState.FIELD_WIDTH - Ball.radius;
 		} else {
-		    tempy = -ballHitSlowRatio * (ball.y + tempy - Ball.radius + GameState.HEIGHT);
-		    ball.y = -GameState.HEIGHT + Ball.radius;
+		    tempy = -BALL_HIT_SLOW_RATIO * (ball.y + tempy - Ball.radius + GameState.FIELD_WIDTH);
+		    ball.y = -GameState.FIELD_WIDTH + Ball.radius;
 		}
 		hitY = true;
 	    }
-	    if (Math.abs(ball.x + tempx) + Ball.radius > GameState.LENGTH) {
+	    if (Math.abs(ball.x + tempx) + Ball.radius > GameState.FIELD_LENGTH) {
 		clear = false;
-		ball.vx *= -ballHitSlowRatio;
+		ball.vx *= -BALL_HIT_SLOW_RATIO;
 		if (ball.x > 0) {
-		    tempx = -ballHitSlowRatio * (ball.x + tempx + Ball.radius - GameState.LENGTH);
-		    ball.x = GameState.LENGTH - Ball.radius;
+		    tempx = -BALL_HIT_SLOW_RATIO * (ball.x + tempx + Ball.radius - GameState.FIELD_LENGTH);
+		    ball.x = GameState.FIELD_LENGTH - Ball.radius;
 		} else {
-		    tempx = -ballHitSlowRatio * (ball.x + tempx - Ball.radius + GameState.LENGTH);
-		    ball.x = -GameState.LENGTH + Ball.radius;
+		    tempx = -BALL_HIT_SLOW_RATIO * (ball.x + tempx - Ball.radius + GameState.FIELD_LENGTH);
+		    ball.x = -GameState.FIELD_LENGTH + Ball.radius;
 		}
-		if (hitY && dist(0, 0, ball.vx, ball.vy) < 10) {
+		if (hitY && Vector2D.of(ball.vx, ball.vy).magnitude() < 10) {
 		    ball.reset();
 		    return false;
 		}
-		if (Math.abs(ball.y) + Ball.radius < GameState.goalHeight) {
+		if (Math.abs(ball.y) + Ball.radius < GameState.GOAL_HEIGHT) {
 		    return true;
 		}
 	    }
 	}
 	ball.x += tempx;
 	ball.y += tempy;
-	ball.vx *= ballSlowRatio;
-	ball.vy *= ballSlowRatio;
+	ball.vx *= BALL_SLOW_RATIO;
+	ball.vy *= BALL_SLOW_RATIO;
 	return false;
 
     }
@@ -212,30 +242,40 @@ public class GameState {
 	    for (int j = 0; j < allPlayers.length; j++) {
 		if (i == j)
 		    continue;
-		double dist = dist(allPlayers[i].x, allPlayers[i].y, allPlayers[j].x, allPlayers[j].y);
-		if (dist < 2 * Player.radius) {
-		    allPlayers[i].x = (allPlayers[i].x + allPlayers[j].x) / 2
-			    + (allPlayers[i].x - allPlayers[j].x) * Player.radius / dist;
-		    allPlayers[j].x = (allPlayers[i].x + allPlayers[j].x) / 2
-			    + (allPlayers[i].x - allPlayers[j].x) * Player.radius / -dist;
-		    allPlayers[i].y = (allPlayers[i].y + allPlayers[j].y) / 2
-			    + (allPlayers[i].y - allPlayers[j].y) * Player.radius / dist;
-		    allPlayers[j].y = (allPlayers[i].y + allPlayers[j].y) / 2
-			    + (allPlayers[i].y - allPlayers[j].y) * Player.radius / -dist;
+		double dist = Vector2D
+			.of(allPlayers[i].pos.x - allPlayers[j].pos.x, allPlayers[i].pos.y - allPlayers[j].pos.y)
+			.magnitude();
+		if (dist < 2 * Player.RADIUS) {
+		    allPlayers[i].pos = Vector2D.of(
+			    (allPlayers[i].pos.x + allPlayers[j].pos.x) / 2
+				    + (allPlayers[i].pos.x - allPlayers[j].pos.x) * Player.RADIUS / dist,
+			    (allPlayers[i].pos.y + allPlayers[j].pos.y) / 2
+				    + (allPlayers[i].pos.y - allPlayers[j].pos.y) * Player.RADIUS / dist);
 
-		    allPlayers[i].xv += (allPlayers[i].x - allPlayers[j].x) / dist;
-		    allPlayers[i].yv += (allPlayers[i].y - allPlayers[j].y) / dist;
-		    allPlayers[j].xv += (allPlayers[i].x - allPlayers[j].x) / -dist;
-		    allPlayers[j].yv += (allPlayers[i].y - allPlayers[j].y) / -dist;
+		    allPlayers[j].pos = Vector2D.of(
+			    (allPlayers[i].pos.x + allPlayers[j].pos.x) / 2
+				    + (allPlayers[i].pos.x - allPlayers[j].pos.x) * Player.RADIUS / -dist,
+			    (allPlayers[i].pos.y + allPlayers[j].pos.y) / 2
+				    + (allPlayers[i].pos.y - allPlayers[j].pos.y) * Player.RADIUS / -dist);
 
+		    allPlayers[i].vel = allPlayers[i].vel
+			    .plus(Vector2D.of((allPlayers[i].pos.x - allPlayers[j].pos.x) / dist,
+				    (allPlayers[i].pos.y - allPlayers[j].pos.y) / dist));
+		    allPlayers[j].vel = allPlayers[j].vel
+			    .plus(Vector2D.of((allPlayers[i].pos.x - allPlayers[j].pos.x) / -dist,
+				    (allPlayers[i].pos.y - allPlayers[j].pos.y) / -dist));
 		}
-		if (dist < 2 * Player.radius + Player.shockwaveRadius && allPlayers[i].shockwaveFrame > 0) {
-		    allPlayers[j].xv += (allPlayers[i].x - allPlayers[j].x) * 10 / -dist;
-		    allPlayers[j].yv += (allPlayers[i].y - allPlayers[j].y) * 10 / -dist;
+		if (dist < 2 * Player.RADIUS + Player.SHOCKWAVE_RADIUS
+			&& allPlayers[i].shockwaveAnimationFramesLeft > 0) {
+		    allPlayers[j].vel = allPlayers[j].vel
+			    .plus(Vector2D.of((allPlayers[i].pos.x - allPlayers[j].pos.x) * 10 / -dist,
+				    (allPlayers[i].pos.y - allPlayers[j].pos.y) * 10 / -dist));
 		}
-		if (dist < 2 * Player.radius + Player.shockwaveRadius && allPlayers[j].shockwaveFrame > 0) {
-		    allPlayers[i].xv += (allPlayers[i].x - allPlayers[j].x) * 10 / dist;
-		    allPlayers[i].yv += (allPlayers[i].y - allPlayers[j].y) * 10 / dist;
+		if (dist < 2 * Player.RADIUS + Player.SHOCKWAVE_RADIUS
+			&& allPlayers[j].shockwaveAnimationFramesLeft > 0) {
+		    allPlayers[i].vel = allPlayers[i].vel
+			    .plus(Vector2D.of((allPlayers[i].pos.x - allPlayers[j].pos.x) * 10 / dist,
+				    (allPlayers[i].pos.y - allPlayers[j].pos.y) * 10 / dist));
 		}
 	    }
 	}
@@ -246,7 +286,7 @@ public class GameState {
 	g.translate(width / 2, height / 2);
 
 	g.setFill(Color.GRAY);
-	g.fillRect(-LENGTH, -HEIGHT, 2 * LENGTH, 2 * HEIGHT);
+	g.fillRect(-FIELD_LENGTH, -FIELD_WIDTH, 2 * FIELD_LENGTH, 2 * FIELD_WIDTH);
 	for (int i = 0; i < lTeam.length; i++) {
 	    lTeam[i].drawShockwave(g);
 	}
@@ -262,14 +302,14 @@ public class GameState {
 	ball.draw(g);
 
 	g.setFill(Color.BLACK);
-	g.fillRect(-width / 2, -height / 2, width / 2 - LENGTH, height);
-	g.fillRect(LENGTH, -height / 2, width / 2 - LENGTH, height);
-	g.fillRect(-LENGTH, -height / 2, 2 * LENGTH, height / 2 - HEIGHT);
-	g.fillRect(-LENGTH, HEIGHT, 2 * LENGTH, height / 2 - HEIGHT);
+	g.fillRect(-width / 2, -height / 2, width / 2 - FIELD_LENGTH, height);
+	g.fillRect(FIELD_LENGTH, -height / 2, width / 2 - FIELD_LENGTH, height);
+	g.fillRect(-FIELD_LENGTH, -height / 2, 2 * FIELD_LENGTH, height / 2 - FIELD_WIDTH);
+	g.fillRect(-FIELD_LENGTH, FIELD_WIDTH, 2 * FIELD_LENGTH, height / 2 - FIELD_WIDTH);
 	g.setFill(Color.ORANGE);
-	g.fillRect(-width / 2, -goalHeight, width / 2 - LENGTH, goalHeight * 2);
+	g.fillRect(-width / 2, -GOAL_HEIGHT, width / 2 - FIELD_LENGTH, GOAL_HEIGHT * 2);
 	g.setFill(Color.BLUE);
-	g.fillRect(LENGTH, -goalHeight, width / 2 - LENGTH, goalHeight * 2);
+	g.fillRect(FIELD_LENGTH, -GOAL_HEIGHT, width / 2 - FIELD_LENGTH, GOAL_HEIGHT * 2);
 	g.setFont(new Font("timesRoman", 70));
 	if (pause != 0) {
 	    g.setFill(Color.DARKGRAY);
@@ -284,13 +324,21 @@ public class GameState {
 	g.setFill(Color.WHITE);
 	g.fillText("" + lScore, -width / 2 + 50, height / 2 - 20);
 	g.fillText("" + rScore, width / 2 - 100, height / 2 - 20);
-	if (replay) {
-	    g.fillText("" + replayTime / 60, 0, -height / 2 + 50);
+	if (isReplaying) {
+	    g.fillText("" + replayTimeLeft / 60, 0, -height / 2 + 50);
 	    g.setFill(Color.YELLOW);
 	    g.fillText("REPLAY", width / 2 - 300, -height / 2 + 50);
 	} else {
 	    g.fillText("" + time / 60, 0, -height / 2 + 50);
 	}
 	g.setTransform(origTransform);
+    }
+
+    public int getLeftScore() {
+	return lScore;
+    }
+
+    public int getRightScore() {
+	return rScore;
     }
 }
