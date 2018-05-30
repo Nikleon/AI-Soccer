@@ -5,7 +5,7 @@ import java.util.Random;
 import org.ejml.simple.SimpleMatrix;
 
 public class NeuralNet implements Comparable<NeuralNet>, Cloneable {
-    public static final int[] DEFAULT_SHAPE = { 16, 16, 16, 3 };
+    public static final int[] DEFAULT_SHAPE = { 16, 8, 8, 3 };
     public static final int NUM_WEIGHTS;
     static {
 	int num = 0;
@@ -132,6 +132,11 @@ public class NeuralNet implements Comparable<NeuralNet>, Cloneable {
 	    e.printStackTrace();
 	    return null;
 	}
+    }
+
+    @Override
+    public String toString() {
+	return "" + scoreCache;
     }
 
 }
