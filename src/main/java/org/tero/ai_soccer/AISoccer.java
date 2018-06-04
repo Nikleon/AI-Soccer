@@ -1,7 +1,5 @@
 package org.tero.ai_soccer;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,20 +17,19 @@ import javafx.stage.Stage;
 public class AISoccer extends Application {
 	private static final String TITLE = "AI Soccer (Neuro-evolution implementation)";
 
-	private static final boolean VIEW = true;
-	private static final String VIEW_FILE_1 = "shallow0";
-	private static final String VIEW_FILE_2 = "shallow1";
+	private static final boolean VIEW = false;
+	private static final String VIEW_FILE_1 = "mit0";
+	private static final String VIEW_FILE_2 = "mit1";
 
 	private static boolean vs_Andrew = true;
-	public static final double ANDREW_MAX_SPEED = 3;
 	private static final Class<GeneticNeuralNet> AI_TYPE = GeneticNeuralNet.class;
-	private static final String SAVE_PREFIX = "shallow";
+	private static final String SAVE_PREFIX = "mit";
 
 	private static final int CYCLE = 100_000_000;
 
-	private static final int POPULATION_SIZE = 50;
-	private static final int ELITES = 5;
-	private static final double MUTATION_RATE = 5.0 / NeuralNet.NUM_WEIGHTS;
+	private static final int POPULATION_SIZE = 100;
+	private static final int ELITES = 10;
+	private static final double MUTATION_RATE = 0.1;
 
 	private static final int MAX_GEN = 100_000;
 	private static final int FRAMES_PER_BACKUP = 20;
@@ -90,16 +87,16 @@ public class AISoccer extends Application {
 				if (vs_Andrew)
 					for (int i = 0; i < POPULATION_SIZE; i++) {
 						GameState match = matches.get(i);
-						population.get(i).cacheScore(
-								(double) match.getLeftScore() / (match.getLeftScore() + match.getRightScore()));
+						double lScore = Math.max(match.getLeftScore(), 0);
+						population.get(i).cacheScore(lScore / (lScore + match.getRightScore()));
 					}
 				else {
 					for (int i = 0; i < POPULATION_SIZE; i += 2) {
 						GameState match = matches.get(i / 2);
-						population.get(i).cacheScore(Math.pow(match.getLeftScore(), 2)
-								+ Math.max(match.getLeftScore() - match.getRightScore(), 0));
-						population.get(i + 1).cacheScore(Math.pow(match.getRightScore(), 2)
-								+ Math.max(match.getRightScore() - match.getLeftScore(), 0));
+						population.get(i).cacheScore(Math.max(
+								match.getLeftScore() - match.getRightScore() + Math.pow(match.getLeftScore(), 2), 0));
+						population.get(i + 1).cacheScore(Math.max(
+								match.getRightScore() - match.getLeftScore() + Math.pow(match.getRightScore(), 2), 0));
 					}
 				}
 
@@ -111,7 +108,10 @@ public class AISoccer extends Application {
 					nextPopulation.add(population.get(i).clone());
 
 				// roulette survival
-				double totalScore = population.stream().mapToDouble(individual -> individual.getScoreCache()).sum();
+				double totalScore = 0;
+				for (GeneticNeuralNet net : population)
+					totalScore += net.getScoreCache();
+
 				for (int i = 0; i < POPULATION_SIZE - ELITES; i++) {
 					double random = Math.random() * totalScore;
 					int index = -1;
@@ -124,6 +124,10 @@ public class AISoccer extends Application {
 					nextPopulation.add(offspring);
 				}
 
+//				for (int i = 0; i < POPULATION_SIZE; i++) {
+//					nextPopulation.get(i).decay(0.003);
+//				}
+
 				// print stats
 				if (vs_Andrew) {
 					double minScore = Collections.max(population).getScoreCache();
@@ -132,22 +136,22 @@ public class AISoccer extends Application {
 					System.out.format("Min: %.2f, Max: %.2f, Avg: %.2f%n%n", minScore, maxScore, avgScore);
 
 					// TODO: temp (plot running avg)
-					if (gen % 10 == 0) {
-						FileWriter out = new FileWriter(new File("stats/avg.txt"), true);
-						out.append(avgScore + "\n");
-						out.close();
-					}
+					// if (gen % 10 == 0) {
+					// FileWriter out = new FileWriter(new File("stats/avg.txt"), true);
+					// out.append(avgScore + "\n");
+					// out.close();
+					// }	
 				} else {
 					double minScore = Collections.max(population).getScoreCache();
 					double maxScore = Collections.min(population).getScoreCache();
 					System.out.format("Min: %.2f, Max: %.2f%n%n", minScore, maxScore);
 
 					// TODO: temp (plot running avg)
-					if (gen % 10 == 0) {
-						FileWriter out = new FileWriter(new File("stats/max  .txt"), true);
-						out.append(maxScore + "\n");
-						out.close();
-					}
+					// if (gen % 10 == 0) {
+					// FileWriter out = new FileWriter(new File("stats/max.txt"), true);
+					// out.append(maxScore + "\n");
+					// out.close();
+					// }
 				}
 
 				// save a backup

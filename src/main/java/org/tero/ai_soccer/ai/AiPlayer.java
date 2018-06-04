@@ -18,10 +18,10 @@ public class AiPlayer extends Player {
     @Override
     public Action takeAction(Context ctx) {
 	double[] output = brainzz.predict(ctx.getRelativeContext(leftTeam, number, transform));
-	boolean maxOutput = true;
+	boolean maxOutput = false;
 	double norm = Vector2D.of(output[0], output[1]).magnitude();
-	Action action = new Action((maxOutput ? (5.0 / norm) : 1) * output[0],
-		(maxOutput ? (5.0 / norm) : 1) * output[1], output[2] < 0);
+	Action action = new Action((maxOutput ? (5.0 / norm) : 5) * output[0],
+		(maxOutput ? (5.0 / norm) : 5) * output[1], output[2] < 0);
 	return action.relativeToGlobal(transform);
     }
 

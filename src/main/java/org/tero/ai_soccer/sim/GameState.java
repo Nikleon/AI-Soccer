@@ -36,6 +36,8 @@ public class GameState {
 	private double lScore;
 	private double rScore;
 
+	private int lastTouch = 0;
+
 	public GameState(NeuralNet ai1, NeuralNet ai2) {
 		isReplaying = false;
 		replayTimeLeft = 0;
@@ -127,10 +129,15 @@ public class GameState {
 				isReplaying = false;
 				replayTimeLeft = 0;
 			} else {
-				if (ball.x < 0)
-					rScore += 1; // TODO
-				else
+				if (ball.x < 0) {
+					rScore += 1;
+					if (lastTouch == -1)
+						lScore -= 1;
+				} else {
 					lScore += 1;
+					if (lastTouch == 1)
+						rScore -= 1;
+				}
 				pause = 90;
 
 				fillTeams(leftAi, rightAi);
@@ -139,6 +146,7 @@ public class GameState {
 				isReplaying = false;
 
 				ball.reset();
+				lastTouch = 0;
 				// ball.x = ballStartPos.x;
 				// ball.y = ballStartPos.y;
 				// int tempTime = replayTimeLeft;
@@ -157,10 +165,14 @@ public class GameState {
 				ball.vy += (ball.y - lTeam[i].pos.y) / dist * 2.5;
 				ball.x = lTeam[i].pos.x + (ball.x - lTeam[i].pos.x) * (Player.RADIUS + Ball.radius) / dist;
 				ball.y = lTeam[i].pos.y + (ball.y - lTeam[i].pos.y) * (Player.RADIUS + Ball.radius) / dist;
+				lScore += 0.01;
+				lastTouch = -1;
 			}
 			if (dist < Player.RADIUS + Player.SHOCKWAVE_RADIUS && lTeam[i].shockwaveAnimationFramesLeft > 0) {
 				ball.vx += (ball.x - lTeam[i].pos.x) / dist * 20;
 				ball.vy += (ball.y - lTeam[i].pos.y) / dist * 20;
+				lScore += 0.005;
+				lastTouch = -1;
 			}
 			dist = Vector2D.of(rTeam[i].pos.x - ball.x, rTeam[i].pos.y - ball.y).magnitude();
 			if (dist < Player.RADIUS + Ball.radius) {
@@ -168,10 +180,14 @@ public class GameState {
 				ball.vy += (ball.y - rTeam[i].pos.y) / dist * 2.5;
 				ball.x = rTeam[i].pos.x + (ball.x - rTeam[i].pos.x) * (Player.RADIUS + Ball.radius) / dist;
 				ball.y = rTeam[i].pos.y + (ball.y - rTeam[i].pos.y) * (Player.RADIUS + Ball.radius) / dist;
+				rScore += 0.01;
+				lastTouch = 1;
 			}
 			if (dist < Player.RADIUS + Player.SHOCKWAVE_RADIUS && rTeam[i].shockwaveAnimationFramesLeft > 0) {
 				ball.vx += (ball.x - rTeam[i].pos.x) / dist * 20;
 				ball.vy += (ball.y - rTeam[i].pos.y) / dist * 20;
+				rScore += 0.005;
+				lastTouch = 1;
 			}
 		}
 		double speed = Vector2D.of(ball.vx, ball.vy).magnitude();

@@ -3,6 +3,9 @@ package org.tero.ai_soccer.sim.env;
 import java.util.Arrays;
 
 import org.tero.ai_soccer.ai.NeuralNet;
+import org.tero.ai_soccer.sim.Ball;
+import org.tero.ai_soccer.sim.GameState;
+import org.tero.ai_soccer.sim.Player;
 import org.tero.ai_soccer.util.Vector2D;
 
 import javafx.scene.canvas.GraphicsContext;
@@ -23,12 +26,14 @@ public class Soccer extends Environment {
 	private static final Paint LEFT_FILL = Color.ORANGE;
 	private static final Paint RIGHT_FILL = Color.BLUE;
 	private static final boolean DRAW_TRAIL = true;
+	private static final double ANDREW_MAX_SPEED = 3;
 	private static final int TEAM_SIZE = 3;
 
 	private static final int COUNTDOWN_FRAMES = 90;
 	private int countdown;
+	private int time;
 
-	private int lastHit = 0; // -1: left, 1: right
+	private SoccerPlayer lastHitter;
 
 	private NeuralNet leftAi;
 	private NeuralNet rightAi;
@@ -43,8 +48,8 @@ public class Soccer extends Environment {
 		rightAi = ai2;
 
 		for (int id = 0; id < TEAM_SIZE; id++) {
-			leftTeam[id] = new SoccerPlayer(leftAi, true);
-			rightTeam[id] = new SoccerPlayer(rightAi, false);
+			leftTeam[id] = new SoccerPlayer(leftAi, true, id);
+			rightTeam[id] = new SoccerPlayer(rightAi, false, id);
 		}
 
 		reset();
@@ -52,9 +57,99 @@ public class Soccer extends Environment {
 
 	@Override
 	public void update() {
+		if (countdown > 0) {
+			countdown--;
+			return;
+		}
+		if (countdown == -1) {
+			return;
+		}
+		time++;
+
 		for (int id = 0; id < TEAM_SIZE; id++) {
 			leftTeam[id].getNextAction().apply();
 			rightTeam[id].getNextAction().apply();
+		}
+
+		checkPlayerCollisions();
+		updateBall();
+	}
+
+	private void checkPlayerCollisions() {
+
+	}
+
+	private void updateBall() {
+		Vector2D pos = context.ballPos();
+		Vector2D fPos = pos.plus(context.ballVel());
+
+		if (Math.abs(fPos.x) + BALL_RADIUS > HALF_FIELD_LENGTH) {
+			if (Math.abs(fPos.y) < GOAL_HEIGHT / 2) {
+				awardGoal();
+				reset();
+				return;
+			}
+
+			// TODO: continue this holy shit makes sure you have nothing due!!
+		}
+		/*
+		 * for (int i = 0; i < lTeam.length; i++) { double dist =
+		 * Vector2D.of(lTeam[i].pos.x - ball.x, lTeam[i].pos.y - ball.y).magnitude(); if
+		 * (dist < Player.RADIUS + Ball.radius) { ball.vx += (ball.x - lTeam[i].pos.x) /
+		 * dist * 2.5; ball.vy += (ball.y - lTeam[i].pos.y) / dist * 2.5; ball.x =
+		 * lTeam[i].pos.x + (ball.x - lTeam[i].pos.x) * (Player.RADIUS + Ball.radius) /
+		 * dist; ball.y = lTeam[i].pos.y + (ball.y - lTeam[i].pos.y) * (Player.RADIUS +
+		 * Ball.radius) / dist; } if (dist < Player.RADIUS + Player.SHOCKWAVE_RADIUS &&
+		 * lTeam[i].shockwaveAnimationFramesLeft > 0) { ball.vx += (ball.x -
+		 * lTeam[i].pos.x) / dist * 20; ball.vy += (ball.y - lTeam[i].pos.y) / dist *
+		 * 20; } dist = Vector2D.of(rTeam[i].pos.x - ball.x, rTeam[i].pos.y -
+		 * ball.y).magnitude(); if (dist < Player.RADIUS + Ball.radius) { ball.vx +=
+		 * (ball.x - rTeam[i].pos.x) / dist * 2.5; ball.vy += (ball.y - rTeam[i].pos.y)
+		 * / dist * 2.5; ball.x = rTeam[i].pos.x + (ball.x - rTeam[i].pos.x) *
+		 * (Player.RADIUS + Ball.radius) / dist; ball.y = rTeam[i].pos.y + (ball.y -
+		 * rTeam[i].pos.y) * (Player.RADIUS + Ball.radius) / dist; } if (dist <
+		 * Player.RADIUS + Player.SHOCKWAVE_RADIUS &&
+		 * rTeam[i].shockwaveAnimationFramesLeft > 0) { ball.vx += (ball.x -
+		 * rTeam[i].pos.x) / dist * 20; ball.vy += (ball.y - rTeam[i].pos.y) / dist *
+		 * 20; } } double speed = Vector2D.of(ball.vx, ball.vy).magnitude(); if (speed >
+		 * 30) { ball.vx *= 30 / speed; ball.vy *= 30 / speed; } double tempx = ball.vx;
+		 * double tempy = ball.vy; boolean clear = false; while (!clear) { clear = true;
+		 * boolean hitY = false; if (Math.abs(ball.y + tempy) + Ball.radius >
+		 * GameState.FIELD_WIDTH) { clear = false; ball.vy *= -BALL_HIT_SLOW_RATIO; if
+		 * (ball.y > 0) { tempy = -BALL_HIT_SLOW_RATIO * (ball.y + tempy + Ball.radius -
+		 * GameState.FIELD_WIDTH); ball.y = GameState.FIELD_WIDTH - Ball.radius; } else
+		 * { tempy = -BALL_HIT_SLOW_RATIO * (ball.y + tempy - Ball.radius +
+		 * GameState.FIELD_WIDTH); ball.y = -GameState.FIELD_WIDTH + Ball.radius; } hitY
+		 * = true; } if (Math.abs(ball.x + tempx) + Ball.radius >
+		 * GameState.FIELD_LENGTH) { clear = false; ball.vx *= -BALL_HIT_SLOW_RATIO; if
+		 * (ball.x > 0) { tempx = -BALL_HIT_SLOW_RATIO * (ball.x + tempx + Ball.radius -
+		 * GameState.FIELD_LENGTH); ball.x = GameState.FIELD_LENGTH - Ball.radius; }
+		 * else { tempx = -BALL_HIT_SLOW_RATIO * (ball.x + tempx - Ball.radius +
+		 * GameState.FIELD_LENGTH); ball.x = -GameState.FIELD_LENGTH + Ball.radius; } if
+		 * (hitY && Vector2D.of(ball.vx, ball.vy).magnitude() < 10) { ball.reset();
+		 * return false; } if (Math.abs(ball.y) + Ball.radius < GameState.GOAL_HEIGHT) {
+		 * return true; } } } ball.x += tempx; ball.y += tempy; ball.vx *=
+		 * BALL_SLOW_RATIO; ball.vy *= BALL_SLOW_RATIO;
+		 * 
+		 * return false;
+		 */
+
+	}
+
+	private void awardGoal() {
+		if (lastHitter == null)
+			return;
+
+		if (context.ballPos().x < 0) {
+			if (lastHitter.leftTeam)
+				lastHitter.scoreMap.modify("owngoals", +1);
+			else
+				lastHitter.scoreMap.modify("goals", +1);
+		} else {
+			if (lastHitter.leftTeam)
+				lastHitter.scoreMap.modify("goals", +1);
+			else
+				lastHitter.scoreMap.modify("owngoals", +1);
 		}
 	}
 
@@ -70,7 +165,7 @@ public class Soccer extends Environment {
 		// initialize game state
 		context = new SoccerContext(spawnPoints, ballX, ballY, 0, 0);
 
-		// initialize countdown
+		// initialize time counts
 		countdown = COUNTDOWN_FRAMES;
 	}
 
@@ -150,10 +245,10 @@ public class Soccer extends Environment {
 		}
 
 		// draw trail
-		if (DRAW_TRAIL && lastHit != 0) {
-			if (lastHit == -1)
+		if (DRAW_TRAIL && lastHitter != null) {
+			if (lastHitter.leftTeam)
 				g.setStroke(LEFT_FILL);
-			else if (lastHit == 1)
+			else
 				g.setStroke(RIGHT_FILL);
 			Vector2D pos = context.ballPos();
 			Vector2D vel = context.ballVel();
@@ -230,12 +325,56 @@ public class Soccer extends Environment {
 			return data;
 		}
 
+		double[] getRelativeData(Transform transform, boolean leftTeam, int id) {
+			double[] relativeData = getRelativeData(transform);
+			double[] unbiasedData = new double[relativeData.length];
+
+			// determine input ordering
+			int[] idOrder = new int[TEAM_SIZE];
+			for (int i = 0; i < TEAM_SIZE; i++)
+				idOrder[i] = (id + i) % TEAM_SIZE;
+			int allyOffset = (leftTeam) ? LEFT_POS_OFFSET : RIGHT_POS_OFFSET;
+			int enemyOffset = (leftTeam) ? RIGHT_POS_OFFSET : LEFT_POS_OFFSET;
+			int index = 0;
+
+			// fill data array
+			unbiasedData[index++] = relativeData[allyOffset + 2 * idOrder[0]];
+			unbiasedData[index++] = relativeData[allyOffset + 2 * idOrder[0] + 1];
+
+			unbiasedData[index++] = relativeData[BALL_POS_OFFSET];
+			unbiasedData[index++] = relativeData[BALL_POS_OFFSET + 1];
+			unbiasedData[index++] = relativeData[BALL_VEL_OFFSET];
+			unbiasedData[index++] = relativeData[BALL_VEL_OFFSET + 1];
+
+			for (int i = 1; i < TEAM_SIZE; i++) {
+				unbiasedData[index++] = relativeData[allyOffset + 2 * idOrder[i]];
+				unbiasedData[index++] = relativeData[allyOffset + 2 * idOrder[i] + 1];
+			}
+
+			for (int i = 0; i < TEAM_SIZE; i++) {
+				unbiasedData[index++] = relativeData[enemyOffset + 2 * idOrder[i]];
+				unbiasedData[index++] = relativeData[enemyOffset + 2 * idOrder[i] + 1];
+			}
+
+			return unbiasedData;
+		}
+
 		Vector2D ballPos() {
 			return new Vector2D(data[BALL_POS_OFFSET], data[BALL_POS_OFFSET + 1]);
 		}
 
+		void setBallPos(Vector2D pos) {
+			data[BALL_POS_OFFSET] = pos.x;
+			data[BALL_POS_OFFSET + 1] = pos.y;
+		}
+
 		Vector2D ballVel() {
 			return new Vector2D(data[BALL_VEL_OFFSET], data[BALL_VEL_OFFSET + 1]);
+		}
+
+		void setBallVel(Vector2D vel) {
+			data[BALL_VEL_OFFSET] = vel.x;
+			data[BALL_VEL_OFFSET + 1] = vel.y;
 		}
 
 		Vector2D playerPos(boolean leftTeam, int id) {
@@ -265,24 +404,28 @@ public class Soccer extends Environment {
 
 		@Override
 		void apply() {
-			// TODO: this is basically the update method
+			// TODO
 		}
 	}
 
 	private class SoccerPlayer extends Soccer.Entity {
 		Transform transform;
+		boolean leftTeam;
+		int id;
 		double shockwaveWtf; // TODO: this shouldnt have to be here. also wtf does this represent?
 
-		SoccerPlayer(NeuralNet controller, boolean leftTeam) {
+		SoccerPlayer(NeuralNet controller, boolean leftTeam, int id) {
 			super(controller);
 			transform = (leftTeam) ? new Affine() : Transform.rotate(180, 0, 0);
+			this.leftTeam = leftTeam;
+			this.id = id;
 			shockwaveWtf = 0;
 		}
 
 		@Override
 		SoccerPlayerAction getNextAction() {
 			// get relative inputs
-			double[] relativeData = context.getRelativeData(this.transform);
+			double[] relativeData = context.getRelativeData(this.transform, leftTeam, id);
 
 			SoccerPlayerAction relativeAction = null;
 			if (controller != null) {
@@ -290,7 +433,7 @@ public class Soccer extends Environment {
 				relativeAction = new SoccerPlayerAction(this.controller.predict(relativeData));
 			} else {
 				// use default bot
-				// TODO: AndrewMethod
+				relativeAction = applyAndrewMethod(relativeData);
 			}
 
 			// transform relative action to global action
@@ -301,5 +444,82 @@ public class Soccer extends Environment {
 		double getScore() {
 			return scoreMap.get("goals");
 		}
+	}
+
+	SoccerPlayerAction applyAndrewMethod(double[] relativeData) {
+		int index = 0;
+		double x = relativeData[index++];
+		double y = relativeData[index++];
+		double b_x = relativeData[index++];
+		double b_y = relativeData[index++];
+		double b_vx = relativeData[index++];
+		double b_vy = relativeData[index++];
+		double a1_x = relativeData[index++];
+		double a1_y = relativeData[index++];
+		double a2_x = relativeData[index++];
+		double a2_y = relativeData[index++];
+
+		// Farthest away from the ball
+		if (dist(x, y, b_x, b_y) > dist(a1_x, a1_y, b_x, b_y) && dist(x, y, b_x, b_y) > dist(a2_x, a2_y, b_x, b_y)
+				&& x < b_x) {
+			double moveX = 0;
+			double moveY = 0;
+			boolean hit = false;
+
+			moveX = -500 + PLAYER_RADIUS - x;
+			moveY = b_y - y;
+			if (b_y > GOAL_HEIGHT - 30) {
+				moveY = GOAL_HEIGHT - y - 30;
+			}
+			if (b_y < -GOAL_HEIGHT + 30) {
+				moveY = -GOAL_HEIGHT - y + 30;
+			}
+			if (dist(x, y, b_x, b_y) < PLAYER_RADIUS + SHOCKWAVE_INNER_RADIUS && x < b_x) {
+				hit = true;
+			}
+			return new SoccerPlayerAction(new double[] { moveX, moveY, (hit) ? 1 : -1 });
+		}
+
+		// Other 2
+		double moveX = 0;
+		double moveY = 0;
+		boolean hit = false;
+
+		// Check movement
+		if (x > b_x)
+			moveX = -5;
+		else if (Math.abs((y - b_y) / (x - b_x)) > .5) {
+			moveY = b_y - y;
+			if (x - b_x < -100)
+				moveX = b_x - x;
+		} else {
+			moveX = b_x - x;
+			moveY = b_y - y;
+		}
+
+		if (x < -400 && Math.abs(b_y + b_vy / b_vx * (-HALF_FIELD_LENGTH - b_x - BALL_RADIUS)) < GOAL_HEIGHT
+				&& b_vx < 0) {
+			if (b_y > y)
+				moveY = b_y + 7 + b_vy / b_vx * (-HALF_FIELD_LENGTH - b_x + PLAYER_RADIUS) - y;
+			else
+				moveY = b_y - 7 + b_vy / b_vx * (-HALF_FIELD_LENGTH - b_x + PLAYER_RADIUS) - y;
+			moveX = 0;
+		}
+
+		if (dist(x, y, b_x, b_y) < PLAYER_RADIUS + SHOCKWAVE_INNER_RADIUS && x < b_x) {
+			hit = true;
+		}
+
+		double norm = Vector2D.of(moveX, moveY).magnitude();
+		if (norm > ANDREW_MAX_SPEED) {
+			moveX *= ANDREW_MAX_SPEED / norm;
+			moveY *= ANDREW_MAX_SPEED / norm;
+		}
+		return new SoccerPlayerAction(new double[] { moveX, moveY, (hit) ? 1 : -1 });
+	}
+
+	// TODO: get this method replaced by vector funcs
+	private static double dist(double x1, double y1, double x2, double y2) {
+		return Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
 	}
 }
